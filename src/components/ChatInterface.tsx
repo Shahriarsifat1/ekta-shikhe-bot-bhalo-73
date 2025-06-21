@@ -2,8 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Send, Bot, User } from "lucide-react";
+import { Send, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AIService } from "@/services/AIService";
 
@@ -19,7 +18,7 @@ export const ChatInterface = () => {
     {
       id: "1",
       type: "bot",
-      content: "হ্যালো! আমি আদ্রিতা জান্নাত, আপনার স্মার্ট AI সহায়ক। আমি আপনার প্রশ্নের উত্তর দিতে পারি এবং নতুন জিনিস শিখতে পারি। আপনি আমাকে কিছু জিজ্ঞেস করুন!",
+      content: "👋 হ্যালো! আমি আপনার ভার্চুয়াল সহকারী সোফিয়া। কিভাবে সাহায্য করতে পারি?",
       timestamp: new Date()
     }
   ]);
@@ -81,84 +80,81 @@ export const ChatInterface = () => {
   };
 
   return (
-    <Card className="h-full bg-white/90 backdrop-blur-sm border-0 shadow-xl flex flex-col">
-      <CardContent className="p-0 h-full flex flex-col">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`flex items-start space-x-2 max-w-[80%] ${
-                  message.type === "user" ? "flex-row-reverse space-x-reverse" : ""
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    message.type === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-purple-500 text-white"
-                  }`}
-                >
-                  {message.type === "user" ? <User size={16} /> : <Bot size={16} />}
-                </div>
-                <div
-                  className={`rounded-lg p-3 ${
-                    message.type === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.type === "user" ? "text-blue-100" : "text-gray-500"
-                  }`}>
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="flex items-start space-x-2">
-                <div className="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center">
-                  <Bot size={16} />
-                </div>
-                <div className="bg-gray-100 rounded-lg p-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+    <div className="h-full bg-gradient-to-b from-purple-100 to-purple-50 flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div className={`flex items-start space-x-3 max-w-[80%] ${
+              message.type === "user" ? "flex-row-reverse space-x-reverse" : ""
+            }`}>
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                {message.type === "bot" ? (
+                  <img 
+                    src="/lovable-uploads/827fa798-e3ed-47a8-ade8-f0774aac7316.png" 
+                    alt="আদ্রিতা জান্নাত"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-blue-500 flex items-center justify-center">
+                    <User size={20} className="text-white" />
                   </div>
+                )}
+              </div>
+              <div className={`rounded-2xl p-4 max-w-sm ${
+                message.type === "user"
+                  ? "bg-purple-600 text-white rounded-br-md"
+                  : "bg-white text-gray-800 rounded-bl-md shadow-sm"
+              }`}>
+                <p className="text-sm leading-relaxed">{message.content}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-full overflow-hidden">
+                <img 
+                  src="/lovable-uploads/827fa798-e3ed-47a8-ade8-f0774aac7316.png" 
+                  alt="আদ্রিতা জান্নাত"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="bg-white rounded-2xl rounded-bl-md p-4 shadow-sm">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
                 </div>
               </div>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-        
-        <div className="border-t bg-white/50 p-4">
-          <div className="flex space-x-2">
-            <Input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="আপনার প্রশ্ন লিখুন..."
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={isLoading || !inputMessage.trim()}
-              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-            >
-              <Send size={16} />
-            </Button>
           </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      
+      <div className="p-4 bg-white/50">
+        <div className="flex items-center space-x-3 bg-white rounded-full p-2 shadow-sm">
+          <Input
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="প্রশ্ন লিখুন..."
+            disabled={isLoading}
+            className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+          />
+          <Button
+            onClick={handleSendMessage}
+            disabled={isLoading || !inputMessage.trim()}
+            className="bg-purple-600 hover:bg-purple-700 rounded-full w-10 h-10 p-0"
+          >
+            <Send size={16} />
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
