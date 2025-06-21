@@ -1,5 +1,5 @@
 
-import { Settings, MoreVertical } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -11,10 +11,10 @@ export const Header = ({ showAdminButton = true }: HeaderProps) => {
   const navigate = useNavigate();
 
   return (
-    <header className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">
-      <div className="flex items-center justify-between">
+    <header className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-3 fixed top-0 left-0 right-0 z-50 shadow-lg">
+      <div className="flex items-center justify-between max-w-md mx-auto">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-full overflow-hidden">
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/30">
             <img 
               src="/lovable-uploads/827fa798-e3ed-47a8-ade8-f0774aac7316.png" 
               alt="আদ্রিতা জান্নাত"
@@ -22,36 +22,27 @@ export const Header = ({ showAdminButton = true }: HeaderProps) => {
             />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-white">
-              আদ্রিতা জান্নাত
+            <h1 className="text-lg font-medium text-white">
+              আদ্রিতা
             </h1>
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-              <span className="text-sm text-white/90">Online</span>
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-xs text-white/90">অনলাইন</span>
             </div>
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          {showAdminButton && (
-            <Button
-              onClick={() => navigate("/admin")}
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              এডমিন
-            </Button>
-          )}
+        {showAdminButton && (
           <Button
+            onClick={() => navigate("/admin")}
             variant="ghost"
             size="sm"
-            className="text-white hover:bg-white/20 p-2"
+            className="text-white hover:bg-white/20 px-3 py-1 text-xs"
           >
-            <MoreVertical className="h-5 w-5" />
+            <Settings className="h-3 w-3 mr-1" />
+            এডমিন
           </Button>
-        </div>
+        )}
       </div>
     </header>
   );
