@@ -1,4 +1,3 @@
-
 import Fuse from 'fuse.js';
 
 interface KnowledgeItem {
@@ -31,7 +30,19 @@ class AIServiceClass {
     'দেয়': ['দেওয়া', 'দিয়া', 'দিল'],
     'নেয়': ['নেওয়া', 'নিয়া', 'নিল'],
     'আছে': ['আছিল', 'থাকে', 'রয়েছে'],
-    'ছিল': ['ছিলো', 'ছাইল', 'আছিল']
+    'ছিল': ['ছিলো', 'ছাইল', 'আছিল'],
+    'মৃত্যুবরণ': ['মারা যান', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল'],
+    'জন্মগ্রহণ': ['জন্ম', 'জন্মায়', 'জন্মেছিলেন']
+  };
+
+  // Enhanced question patterns for better understanding
+  private questionPatterns = {
+    where: ['কোথায়', 'কোন জায়গায়', 'কোন স্থানে', 'কোন দেশে', 'কোন এলাকায়'],
+    when: ['কখন', 'কোন সময়', 'কত সালে', 'কোন বছর'],
+    what: ['কি', 'কী', 'কোন জিনিস'],
+    who: ['কে', 'কার', 'কোন ব্যক্তি'],
+    how: ['কিভাবে', 'কেমনে', 'কোন উপায়ে'],
+    why: ['কেন', 'কিসের জন্য', 'কোন কারণে']
   };
 
   constructor() {
@@ -92,7 +103,7 @@ class AIServiceClass {
           { name: 'tags', weight: 0.2 },
           { name: 'keywords', weight: 0.1 }
         ],
-        threshold: 0.4, // More lenient matching
+        threshold: 0.3, // More strict matching for better accuracy
         includeScore: true,
         includeMatches: true,
         minMatchCharLength: 2,
@@ -133,6 +144,155 @@ class AIServiceClass {
     return normalized;
   }
 
+  private analyzeQuestionType(question: string): { type: string; keywords: string[] } {
+    const normalizedQuestion = this.normalizeText(question);
+    const questionWords = normalizedQuestion.split(/\s+/);
+    
+    // Extract key question words and main subject
+    const keyWords: string[] = [];
+    let questionType = 'general';
+    
+    // Determine question type
+    for (const [type, patterns] of Object.entries(this.questionPatterns)) {
+      if (patterns.some(pattern => questionWords.includes(pattern))) {
+        questionType = type;
+        break;
+      }
+    }
+    
+    // Extract important keywords (excluding question words)
+    const questionPatternWords = Object.values(this.questionPatterns).flat();
+    questionWords.forEach(word => {
+      if (word.length > 2 && !questionPatternWords.includes(word)) {
+        keyWords.push(word);
+      }
+    });
+    
+    return { type: questionType, keywords: keyWords };
+  }
+
+  private extractSpecificAnswer(content: string, questionType: string, keywords: string[]): string {
+    const sentences = content.split(/[।!?]/).filter(s => s.trim().length > 0);
+    
+    // Find the most relevant sentence based on question type and keywords
+    let bestSentence = '';
+    let maxRelevance = 0;
+    
+    for (const sentence of sentences) {
+      const sentenceNormalized = this.normalizeText(sentence);
+      let relevance = 0;
+      
+      // Check for keyword matches
+      keywords.forEach(keyword => {
+        if (sentenceNormalized.includes(keyword)) {
+          relevance += 2;
+        }
+      });
+      
+      // Add specific relevance based on question type
+      switch (questionType) {
+        case 'where':
+          if (sentenceNormalized.includes('বাংলাদেশে') || 
+              sentenceNormalized.includes('পশ্চিমবঙ্গে') ||
+              sentenceNormalized.includes('ঢাকায়') ||
+              sentenceNormalized.includes('কলকাতায়') ||
+              /\b\w+ে\b/.test(sentenceNormalized)) {
+            relevance += 5;
+          }
+          break;
+        case 'when':
+          if (/\d{4}/.test(sentence) || 
+              sentenceNormalized.includes('সালে') ||
+              sentenceNormalized.includes('সময়ে')) {
+            relevance += 5;
+          }
+          break;
+        case 'what':
+          if (sentenceNormalized.includes('তিনি') || 
+              sentenceNormalized.includes('যিনি')) {
+            relevance += 3;
+          }
+          break;
+      }
+      
+      if (relevance > maxRelevance) {
+        maxRelevance = relevance;
+        bestSentence = sentence.trim();
+      }
+    }
+    
+    return bestSentence || sentences[0]?.trim() || '';
+  }
+
+  private generatePreciseAnswer(question: string, knowledgeItem: KnowledgeItem): string {
+    const questionAnalysis = this.analyzeQuestionType(question);
+    const { type: questionType, keywords } = questionAnalysis;
+    
+    console.log('Question analysis:', questionAnalysis);
+    
+    // Extract the most relevant part of content
+    const relevantSentence = this.extractSpecificAnswer(
+      knowledgeItem.content, 
+      questionType, 
+      keywords
+    );
+    
+    // Generate precise answer based on question type
+    switch (questionType) {
+      case 'where':
+        // Look for specific location information
+        const locationMatch = relevantSentence.match(/(বাংলাদেশে?|পশ্চিমবঙ্গে?|ঢাকায়?|কলকাতায়?|\w+ে)\s*(মৃত্যুবরণ|মারা|জন্ম|জন্মগ্রহণ)?/);
+        if (locationMatch) {
+          const location = locationMatch[1];
+          if (question.includes('মৃত্যু') || question.includes('মারা')) {
+            return location === 'বাংলাদেশে' ? 'বাংলাদেশে' : location;
+          }
+          if (question.includes('জন্ম')) {
+            return location;
+          }
+          return location;
+        }
+        
+        // Fallback: if exact location not found, look in the sentence
+        if (relevantSentence.includes('বাংলাদেশে')) return 'বাংলাদেশে';
+        if (relevantSentence.includes('পশ্চিমবঙ্গ')) return 'পশ্চিমবঙ্গে';
+        break;
+        
+      case 'when':
+        const yearMatch = relevantSentence.match(/(\d{4})/);
+        if (yearMatch) {
+          return yearMatch[1] + ' সালে';
+        }
+        break;
+        
+      case 'what':
+        // For "what" questions, provide a concise definition
+        const titleParts = knowledgeItem.title.split(' ');
+        if (titleParts.length > 2) {
+          return titleParts.slice(1).join(' '); // Remove the name, keep the description
+        }
+        break;
+        
+      case 'who':
+        // Extract the main description about the person
+        const descriptionMatch = relevantSentence.match(/যিনি\s+"([^"]+)"/);
+        if (descriptionMatch) {
+          return descriptionMatch[1];
+        }
+        break;
+    }
+    
+    // If no specific answer found, return the most relevant sentence (shortened)
+    if (relevantSentence) {
+      // Keep it under 100 characters for conciseness
+      return relevantSentence.length > 100 
+        ? relevantSentence.substring(0, 100) + '...'
+        : relevantSentence;
+    }
+    
+    return "দুঃখিত, এই প্রশ্নের সুনির্দিষ্ট উত্তর খুঁজে পাইনি।";
+  }
+
   private findBestMatches(question: string): KnowledgeItem[] {
     const normalizedQuestion = this.normalizeText(question);
     
@@ -140,27 +300,26 @@ class AIServiceClass {
       return [];
     }
     
-    // Use Fuse.js for fuzzy search
+    // Use Fuse.js for fuzzy search with higher accuracy
     const fuseResults = this.fuseInstance.search(normalizedQuestion);
     
+    // Filter results with better scores
+    const goodMatches = fuseResults
+      .filter(result => result.score! < 0.4) // Only good matches
+      .map(result => result.item);
+    
     // Also do traditional keyword matching as fallback
-    const questionWords = normalizedQuestion.split(/\s+/).filter(word => word.length > 2);
-    const keywordMatches = this.knowledgeBase.filter(item => {
-      const itemText = this.normalizeText(`${item.title} ${item.content} ${item.keywords.join(' ')}`);
-      return questionWords.some(word => itemText.includes(word));
-    });
+    if (goodMatches.length === 0) {
+      const questionWords = normalizedQuestion.split(/\s+/).filter(word => word.length > 2);
+      const keywordMatches = this.knowledgeBase.filter(item => {
+        const itemText = this.normalizeText(`${item.title} ${item.content} ${item.keywords.join(' ')}`);
+        return questionWords.some(word => itemText.includes(word));
+      });
+      
+      return keywordMatches.slice(0, 2);
+    }
     
-    // Combine and deduplicate results
-    const allMatches = [
-      ...fuseResults.map(result => result.item),
-      ...keywordMatches
-    ];
-    
-    const uniqueMatches = allMatches.filter((item, index, arr) => 
-      arr.findIndex(i => i.id === item.id) === index
-    );
-    
-    return uniqueMatches.slice(0, 3); // Top 3 matches
+    return goodMatches.slice(0, 2); // Top 2 matches
   }
 
   async learnFromText(title: string, content: string): Promise<void> {
@@ -188,6 +347,13 @@ class AIServiceClass {
     const relevantKnowledge = this.findBestMatches(question);
     
     if (relevantKnowledge.length > 0) {
+      // Try to generate a precise answer first
+      const preciseAnswer = this.generatePreciseAnswer(question, relevantKnowledge[0]);
+      if (preciseAnswer && preciseAnswer !== "দুঃখিত, এই প্রশ্নের সুনির্দিষ্ট উত্তর খুঁজে পাইনি।") {
+        return preciseAnswer;
+      }
+      
+      // Fallback to smart response if precise answer not found
       return this.generateSmartResponse(question, relevantKnowledge);
     }
 
@@ -259,14 +425,14 @@ class AIServiceClass {
     }
 
     if (question.includes('?') || question.includes('কী') || question.includes('কিভাবে') || question.includes('কেন')) {
-      return `এটি একটি আকর্ষণীয় প্রশ্ন! দুঃখিত, আমার কাছে এই বিষয়ে এখনো পর্যাপ্ত তথ্য নেই। আপনি চাইলে আমাকে এই বিষয়ে কিছু শেখাতে পারেন "শেখান" ট্যাবে গিয়ে। আমি এখন আরও স্মার্ট হয়েছি এবং বানান ভুল বা ভিন্নভাবে করা প্রশ্নও বুঝতে পারি।`;
+      return `এটি একটি আকর্ষণীয় প্রশ্ন! দুঃখিত, আমার কাছে এই বিষয়ে এখনো পর্যাপ্ত তথ্য নেই। আপনি চাইলে আমাকে এই বিষয়ে কিছু শেখাতে পারেন "শেখান" ট্যাবে গিয়ে। আমি এখন আরও স্মার্ট হয়েছি এবং সরাসরি উত্তর দিতে পারি।`;
     }
 
     const generalResponses = [
-      "আমি আপনার কথা বুঝতে পারছি। আমি এখন আরও স্মার্ট হয়েছি এবং বানান ভুল বা ভিন্নভাবে করা প্রশ্নও বুঝতে পারি।",
-      "আকর্ষণীয়! আপনি চাইলে আমাকে এই বিষয়ে আরও শেখাতে পারেন। আমি এখন synonyms এবং related words বুঝতে পারি।",
-      "আমি প্রতিদিন নতুন কিছু শিখছি এবং আরও বুদ্ধিমান হচ্ছি। এখন আমি প্রশ্নের মূল অর্থ বুঝতে পারি।",
-      "আমি আপনাকে সাহায্য করতে চাই। আমার নতুন AI ক্ষমতা দিয়ে আমি আরও ভালো উত্তর দিতে পারব।"
+      "আমি আপনার কথা বুঝতে পারছি। আমি এখন ChatGPT ও Gemini এর মতো স্মার্ট হয়েছি এবং সংক্ষিপ্ত, সঠিক উত্তর দিতে পারি।",
+      "আকর্ষণীয়! আপনি চাইলে আমাকে এই বিষয়ে আরও শেখাতে পারেন। আমি এখন প্রসঙ্গ বুঝে নির্দিষ্ট উত্তর দিতে পারি।",
+      "আমি প্রতিদিন নতুন কিছু শিখছি এবং আরও বুদ্ধিমান হচ্ছি। এখন আমি প্রশ্নের মূল অর্থ বুঝে সরাসরি উত্তর দিতে পারি।",
+      "আমি আপনাকে সাহায্য করতে চাই। আমার নতুন AI ক্ষমতা দিয়ে আমি সংক্ষিপ্ত এবং নির্ভুল উত্তর দিতে পারব।"
     ];
 
     return generalResponses[Math.floor(Math.random() * generalResponses.length)];
