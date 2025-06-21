@@ -32,13 +32,14 @@ class AIServiceClass {
     'আছে': ['আছিল', 'থাকে', 'রয়েছে'],
     'ছিল': ['ছিলো', 'ছাইল', 'আছিল'],
     'মৃত্যুবরণ': ['মারা যান', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল'],
-    'জন্মগ্রহণ': ['জন্ম', 'জন্মায়', 'জন্মেছিলেন']
+    'জন্মগ্রহণ': ['জন্ম', 'জন্মায়', 'জন্মেছিলেন'],
+    'গ্রাম': ['গ্রামে', 'পল্লী', 'পল্লীতে']
   };
 
   // Enhanced question patterns for better understanding
   private questionPatterns = {
-    where: ['কোথায়', 'কোন জায়গায়', 'কোন স্থানে', 'কোন দেশে', 'কোন এলাকায়'],
-    when: ['কখন', 'কোন সময়', 'কত সালে', 'কোন বছর'],
+    where: ['কোথায়', 'কোন জায়গায়', 'কোন স্থানে', 'কোন দেশে', 'কোন এলাকায়', 'কোন গ্রামে', 'কোন শহরে'],
+    when: ['কখন', 'কোন সময়', 'কত সালে', 'কোন বছর', 'কোন তারিখে'],
     what: ['কি', 'কী', 'কোন জিনিস'],
     who: ['কে', 'কার', 'কোন ব্যক্তি'],
     how: ['কিভাবে', 'কেমনে', 'কোন উপায়ে'],
@@ -103,7 +104,7 @@ class AIServiceClass {
           { name: 'tags', weight: 0.2 },
           { name: 'keywords', weight: 0.1 }
         ],
-        threshold: 0.3, // More strict matching for better accuracy
+        threshold: 0.4, // Slightly more lenient for better matches
         includeScore: true,
         includeMatches: true,
         minMatchCharLength: 2,
@@ -125,94 +126,176 @@ class AIServiceClass {
       });
     });
     
-    // Simple spelling correction for common mistakes
-    const spellingCorrections: Record<string, string> = {
-      'করতে': 'করে',
-      'বলতে': 'বলে',
-      'নিতে': 'নেয়',
-      'দিতে': 'দেয়',
-      'হতে': 'হয়',
-      'যেতে': 'যায়',
-      'আসতে': 'আসে'
-    };
-    
-    Object.entries(spellingCorrections).forEach(([wrong, correct]) => {
-      const regex = new RegExp(`\\b${wrong}\\b`, 'g');
-      normalized = normalized.replace(regex, correct);
-    });
-    
     return normalized;
   }
 
-  private analyzeQuestionType(question: string): { type: string; keywords: string[] } {
+  private analyzeQuestionAndExtractAnswer(question: string, content: string): string {
     const normalizedQuestion = this.normalizeText(question);
+    const normalizedContent = this.normalizeText(content);
+    
+    console.log('Analyzing question:', normalizedQuestion);
+    console.log('Content to search:', normalizedContent);
+    
+    // Split content into sentences
+    const sentences = content.split(/[।!?\n]/).filter(s => s.trim().length > 0);
+    
+    // Find question type and key information
     const questionWords = normalizedQuestion.split(/\s+/);
-    
-    // Extract key question words and main subject
-    const keyWords: string[] = [];
     let questionType = 'general';
+    let targetEntity = '';
     
-    // Determine question type
+    // Determine question type and extract target entity
     for (const [type, patterns] of Object.entries(this.questionPatterns)) {
-      if (patterns.some(pattern => questionWords.includes(pattern))) {
+      if (patterns.some(pattern => normalizedQuestion.includes(pattern))) {
         questionType = type;
         break;
       }
     }
     
-    // Extract important keywords (excluding question words)
-    const questionPatternWords = Object.values(this.questionPatterns).flat();
-    questionWords.forEach(word => {
-      if (word.length > 2 && !questionPatternWords.includes(word)) {
-        keyWords.push(word);
-      }
-    });
+    // Extract the main subject (person/thing being asked about)
+    const importantWords = questionWords.filter(word => 
+      word.length > 2 && 
+      !Object.values(this.questionPatterns).flat().includes(word) &&
+      !['কোন', 'কি', 'কী', 'করেন', 'করে', 'হয়', 'আছে'].includes(word)
+    );
     
-    return { type: questionType, keywords: keyWords };
+    if (importantWords.length > 0) {
+      targetEntity = importantWords.join(' ');
+    }
+    
+    console.log('Question type:', questionType, 'Target entity:', targetEntity);
+    
+    // Generate specific answer based on question type
+    switch (questionType) {
+      case 'where':
+        return this.extractLocationAnswer(question, sentences, targetEntity);
+      case 'when':
+        return this.extractTimeAnswer(question, sentences, targetEntity);
+      case 'what':
+        return this.extractDefinitionAnswer(question, sentences, targetEntity);
+      case 'who':
+        return this.extractPersonAnswer(question, sentences, targetEntity);
+      default:
+        return this.extractGeneralAnswer(question, sentences, targetEntity);
+    }
   }
 
-  private extractSpecificAnswer(content: string, questionType: string, keywords: string[]): string {
-    const sentences = content.split(/[।!?]/).filter(s => s.trim().length > 0);
+  private extractLocationAnswer(question: string, sentences: string[], targetEntity: string): string {
+    console.log('Extracting location answer for:', targetEntity);
     
-    // Find the most relevant sentence based on question type and keywords
+    for (const sentence of sentences) {
+      const normalizedSentence = this.normalizeText(sentence);
+      
+      // Check if sentence contains the target entity
+      if (targetEntity && !normalizedSentence.includes(targetEntity)) {
+        continue;
+      }
+      
+      // Look for location patterns
+      const locationPatterns = [
+        /(\w+)\s*গ্রামে?\s*(জন্ম|জন্মগ্রহণ)/,
+        /(জন্ম|জন্মগ্রহণ).*?(\w+)\s*গ্রামে?/,
+        /(\w+ে?)\s*(জন্ম|জন্মগ্রহণ|মৃত্যু|মারা)/,
+        /(\w+)\s*(পল্লী|গ্রাম|শহর|জেলা|বিভাগ)ে?\s*(জন্ম|জন্মগ্রহণ)/
+      ];
+      
+      for (const pattern of locationPatterns) {
+        const match = sentence.match(pattern);
+        if (match) {
+          const location = match[1] || match[2];
+          if (location && location.length > 1) {
+            // Format the answer properly
+            if (question.includes('জন্ম')) {
+              return `${targetEntity || 'তিনি'} ${location}${location.endsWith('ে') ? '' : 'তে'} জন্মগ্রহণ করেন।`;
+            } else if (question.includes('মৃত্যু') || question.includes('মারা')) {
+              return `${targetEntity || 'তিনি'} ${location}${location.endsWith('ে') ? '' : 'তে'} মৃত্যুবরণ করেন।`;
+            } else {
+              return `${location}${location.endsWith('ে') ? '' : 'তে'}।`;
+            }
+          }
+        }
+      }
+    }
+    
+    return "দুঃখিত, নির্দিষ্ট স্থানের তথ্য খুঁজে পাইনি।";
+  }
+
+  private extractTimeAnswer(question: string, sentences: string[], targetEntity: string): string {
+    console.log('Extracting time answer for:', targetEntity);
+    
+    for (const sentence of sentences) {
+      const normalizedSentence = this.normalizeText(sentence);
+      
+      if (targetEntity && !normalizedSentence.includes(targetEntity)) {
+        continue;
+      }
+      
+      // Look for year patterns
+      const yearMatch = sentence.match(/(\d{4})\s*সালে?/);
+      if (yearMatch) {
+        const year = yearMatch[1];
+        if (question.includes('জন্ম')) {
+          return `${targetEntity || 'তিনি'} ${year} সালে জন্মগ্রহণ করেন।`;
+        } else if (question.includes('মৃত্যু')) {
+          return `${targetEntity || 'তিনি'} ${year} সালে মৃত্যুবরণ করেন।`;
+        } else {
+          return `${year} সালে।`;
+        }
+      }
+      
+      // Look for date patterns
+      const dateMatch = sentence.match(/(\d{1,2})\s*(জানুয়ারি|ফেব্রুয়ারি|মার্চ|এপ্রিল|মে|জুন|জুলাই|আগস্ট|সেপ্টেম্বর|অক্টোবর|নভেম্বর|ডিসেম্বর)/);
+      if (dateMatch) {
+        return `${dateMatch[1]} ${dateMatch[2]}।`;
+      }
+    }
+    
+    return "দুঃখিত, নির্দিষ্ট সময়ের তথ্য খুঁজে পাইনি।";
+  }
+
+  private extractDefinitionAnswer(question: string, sentences: string[], targetEntity: string): string {
+    for (const sentence of sentences) {
+      const normalizedSentence = this.normalizeText(sentence);
+      
+      if (targetEntity && normalizedSentence.includes(targetEntity)) {
+        // Extract description after the entity name
+        const parts = sentence.split(targetEntity);
+        if (parts.length > 1) {
+          const description = parts[1].trim();
+          if (description.length > 10) {
+            return `${targetEntity} ${description}`;
+          }
+        }
+      }
+    }
+    
+    return sentences[0]?.substring(0, 150) + "..." || "দুঃখিত, সংজ্ঞা খুঁজে পাইনি।";
+  }
+
+  private extractPersonAnswer(question: string, sentences: string[], targetEntity: string): string {
+    for (const sentence of sentences) {
+      if (sentence.includes('যিনি') || sentence.includes('তিনি')) {
+        return sentence.trim();
+      }
+    }
+    return sentences[0]?.trim() || "দুঃখিত, ব্যক্তির তথ্য খুঁজে পাইনি।";
+  }
+
+  private extractGeneralAnswer(question: string, sentences: string[], targetEntity: string): string {
+    // Find the most relevant sentence
     let bestSentence = '';
     let maxRelevance = 0;
+    
+    const questionWords = this.normalizeText(question).split(/\s+/);
     
     for (const sentence of sentences) {
       const sentenceNormalized = this.normalizeText(sentence);
       let relevance = 0;
       
-      // Check for keyword matches
-      keywords.forEach(keyword => {
-        if (sentenceNormalized.includes(keyword)) {
-          relevance += 2;
+      for (const word of questionWords) {
+        if (word.length > 2 && sentenceNormalized.includes(word)) {
+          relevance++;
         }
-      });
-      
-      // Add specific relevance based on question type
-      switch (questionType) {
-        case 'where':
-          if (sentenceNormalized.includes('বাংলাদেশে') || 
-              sentenceNormalized.includes('পশ্চিমবঙ্গে') ||
-              sentenceNormalized.includes('ঢাকায়') ||
-              sentenceNormalized.includes('কলকাতায়') ||
-              /\b\w+ে\b/.test(sentenceNormalized)) {
-            relevance += 5;
-          }
-          break;
-        case 'when':
-          if (/\d{4}/.test(sentence) || 
-              sentenceNormalized.includes('সালে') ||
-              sentenceNormalized.includes('সময়ে')) {
-            relevance += 5;
-          }
-          break;
-        case 'what':
-          if (sentenceNormalized.includes('তিনি') || 
-              sentenceNormalized.includes('যিনি')) {
-            relevance += 3;
-          }
-          break;
       }
       
       if (relevance > maxRelevance) {
@@ -221,76 +304,7 @@ class AIServiceClass {
       }
     }
     
-    return bestSentence || sentences[0]?.trim() || '';
-  }
-
-  private generatePreciseAnswer(question: string, knowledgeItem: KnowledgeItem): string {
-    const questionAnalysis = this.analyzeQuestionType(question);
-    const { type: questionType, keywords } = questionAnalysis;
-    
-    console.log('Question analysis:', questionAnalysis);
-    
-    // Extract the most relevant part of content
-    const relevantSentence = this.extractSpecificAnswer(
-      knowledgeItem.content, 
-      questionType, 
-      keywords
-    );
-    
-    // Generate precise answer based on question type
-    switch (questionType) {
-      case 'where':
-        // Look for specific location information
-        const locationMatch = relevantSentence.match(/(বাংলাদেশে?|পশ্চিমবঙ্গে?|ঢাকায়?|কলকাতায়?|\w+ে)\s*(মৃত্যুবরণ|মারা|জন্ম|জন্মগ্রহণ)?/);
-        if (locationMatch) {
-          const location = locationMatch[1];
-          if (question.includes('মৃত্যু') || question.includes('মারা')) {
-            return location === 'বাংলাদেশে' ? 'বাংলাদেশে' : location;
-          }
-          if (question.includes('জন্ম')) {
-            return location;
-          }
-          return location;
-        }
-        
-        // Fallback: if exact location not found, look in the sentence
-        if (relevantSentence.includes('বাংলাদেশে')) return 'বাংলাদেশে';
-        if (relevantSentence.includes('পশ্চিমবঙ্গ')) return 'পশ্চিমবঙ্গে';
-        break;
-        
-      case 'when':
-        const yearMatch = relevantSentence.match(/(\d{4})/);
-        if (yearMatch) {
-          return yearMatch[1] + ' সালে';
-        }
-        break;
-        
-      case 'what':
-        // For "what" questions, provide a concise definition
-        const titleParts = knowledgeItem.title.split(' ');
-        if (titleParts.length > 2) {
-          return titleParts.slice(1).join(' '); // Remove the name, keep the description
-        }
-        break;
-        
-      case 'who':
-        // Extract the main description about the person
-        const descriptionMatch = relevantSentence.match(/যিনি\s+"([^"]+)"/);
-        if (descriptionMatch) {
-          return descriptionMatch[1];
-        }
-        break;
-    }
-    
-    // If no specific answer found, return the most relevant sentence (shortened)
-    if (relevantSentence) {
-      // Keep it under 100 characters for conciseness
-      return relevantSentence.length > 100 
-        ? relevantSentence.substring(0, 100) + '...'
-        : relevantSentence;
-    }
-    
-    return "দুঃখিত, এই প্রশ্নের সুনির্দিষ্ট উত্তর খুঁজে পাইনি।";
+    return bestSentence || sentences[0]?.trim() || "দুঃখিত, উত্তর খুঁজে পাইনি।";
   }
 
   private findBestMatches(question: string): KnowledgeItem[] {
@@ -300,26 +314,26 @@ class AIServiceClass {
       return [];
     }
     
-    // Use Fuse.js for fuzzy search with higher accuracy
+    // Use Fuse.js for fuzzy search
     const fuseResults = this.fuseInstance.search(normalizedQuestion);
     
-    // Filter results with better scores
+    // Filter results with good scores
     const goodMatches = fuseResults
-      .filter(result => result.score! < 0.4) // Only good matches
+      .filter(result => result.score! < 0.5)
       .map(result => result.item);
     
-    // Also do traditional keyword matching as fallback
     if (goodMatches.length === 0) {
+      // Fallback to keyword matching
       const questionWords = normalizedQuestion.split(/\s+/).filter(word => word.length > 2);
       const keywordMatches = this.knowledgeBase.filter(item => {
         const itemText = this.normalizeText(`${item.title} ${item.content} ${item.keywords.join(' ')}`);
         return questionWords.some(word => itemText.includes(word));
       });
       
-      return keywordMatches.slice(0, 2);
+      return keywordMatches.slice(0, 3);
     }
     
-    return goodMatches.slice(0, 2); // Top 2 matches
+    return goodMatches.slice(0, 3);
   }
 
   async learnFromText(title: string, content: string): Promise<void> {
@@ -346,18 +360,28 @@ class AIServiceClass {
     // Find the best matching knowledge items
     const relevantKnowledge = this.findBestMatches(question);
     
+    console.log('Found relevant knowledge:', relevantKnowledge.length);
+    
     if (relevantKnowledge.length > 0) {
-      // Try to generate a precise answer first
-      const preciseAnswer = this.generatePreciseAnswer(question, relevantKnowledge[0]);
-      if (preciseAnswer && preciseAnswer !== "দুঃখিত, এই প্রশ্নের সুনির্দিষ্ট উত্তর খুঁজে পাইনি।") {
+      // Try to extract a precise answer using the new method
+      const preciseAnswer = this.analyzeQuestionAndExtractAnswer(question, relevantKnowledge[0].content);
+      
+      if (preciseAnswer && !preciseAnswer.includes('দুঃখিত')) {
         return preciseAnswer;
       }
       
-      // Fallback to smart response if precise answer not found
+      // If no precise answer, try with multiple knowledge sources
+      for (const knowledge of relevantKnowledge) {
+        const answer = this.analyzeQuestionAndExtractAnswer(question, knowledge.content);
+        if (answer && !answer.includes('দুঃখিত')) {
+          return answer;
+        }
+      }
+      
+      // Fallback to smart response
       return this.generateSmartResponse(question, relevantKnowledge);
     }
 
-    // Generate a general response if no specific knowledge found
     return this.generateGeneralResponse(question);
   }
 
