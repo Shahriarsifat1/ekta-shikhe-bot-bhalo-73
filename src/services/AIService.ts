@@ -13,7 +13,7 @@ class AIServiceClass {
   private knowledgeBase: KnowledgeItem[] = [];
   private fuseInstance: Fuse<KnowledgeItem> | null = null;
 
-  // Bengali to English common word mapping for better understanding
+  // Enhanced Bengali to English mapping and synonyms
   private bengaliSynonyms: Record<string, string[]> = {
     'কি': ['কী', 'কেমন', 'কোন'],
     'কী': ['কি', 'কেমন', 'কোন'],
@@ -33,17 +33,31 @@ class AIServiceClass {
     'ছিল': ['ছিলো', 'ছাইল', 'আছিল'],
     'মৃত্যুবরণ': ['মারা যান', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল'],
     'জন্মগ্রহণ': ['জন্ম', 'জন্মায়', 'জন্মেছিলেন'],
-    'গ্রাম': ['গ্রামে', 'পল্লী', 'পল্লীতে']
+    'গ্রাম': ['গ্রামে', 'পল্লী', 'পল্লীতে'],
+    'নাম': ['নামধারী', 'নামক', 'নামের'],
+    'বাবা': ['পিতা', 'পিতার', 'বাবার'],
+    'মা': ['মাতা', 'মায়ের', 'মাতার'],
+    'মেয়ে': ['কন্যা', 'কন্যার', 'মেয়ের'],
+    'ছেলে': ['পুত্র', 'পুত্রের', 'ছেলের']
   };
 
   // Enhanced question patterns for better understanding
   private questionPatterns = {
+    name: ['নাম', 'নামের', 'নামটি', 'নামক', 'কি নাম', 'কী নাম'],
     where: ['কোথায়', 'কোন জায়গায়', 'কোন স্থানে', 'কোন দেশে', 'কোন এলাকায়', 'কোন গ্রামে', 'কোন শহরে'],
     when: ['কখন', 'কোন সময়', 'কত সালে', 'কোন বছর', 'কোন তারিখে'],
     what: ['কি', 'কী', 'কোন জিনিস'],
     who: ['কে', 'কার', 'কোন ব্যক্তি'],
     how: ['কিভাবে', 'কেমনে', 'কোন উপায়ে'],
     why: ['কেন', 'কিসের জন্য', 'কোন কারণে']
+  };
+
+  // Relationship mapping
+  private relationshipMapping: Record<string, string[]> = {
+    'বাবা': ['বাবার', 'পিতা', 'পিতার'],
+    'মা': ['মা', 'মাতা', 'মায়ের', 'মাতার'],
+    'মেয়ে': ['মেয়ে', 'মেয়ের', 'কন্যা', 'কন্যার'],
+    'ছেলে': ['ছেলে', 'ছেলের', 'পুত্র', 'পুত্রের']
   };
 
   constructor() {
@@ -82,13 +96,11 @@ class AIServiceClass {
   }
 
   private extractKeywords(content: string): string[] {
-    // Enhanced keyword extraction
     const words = content.toLowerCase()
       .replace(/[।,;:!?\-()]/g, ' ')
       .split(/\s+/)
       .filter(word => word.length > 2);
     
-    // Remove common stop words
     const stopWords = ['এবং', 'বা', 'কিন্তু', 'তবে', 'যদি', 'তাহলে', 'এই', 'সেই', 'যে', 'যা', 'যার', 'তার', 'এর', 'সে', 'তা', 'এটা', 'ওটা', 'একটি', 'একটা', 'কোনো', 'কোন'];
     const filteredWords = words.filter(word => !stopWords.includes(word));
     
@@ -104,7 +116,7 @@ class AIServiceClass {
           { name: 'tags', weight: 0.2 },
           { name: 'keywords', weight: 0.1 }
         ],
-        threshold: 0.4, // Slightly more lenient for better matches
+        threshold: 0.4,
         includeScore: true,
         includeMatches: true,
         minMatchCharLength: 2,
@@ -129,6 +141,115 @@ class AIServiceClass {
     return normalized;
   }
 
+  // New enhanced question analysis method
+  private extractSpecificAnswer(question: string, content: string): string {
+    const normalizedQuestion = this.normalizeText(question);
+    const normalizedContent = this.normalizeText(content);
+    
+    console.log('Analyzing specific question:', normalizedQuestion);
+    console.log('Content to analyze:', normalizedContent);
+    
+    // Parse content into structured information
+    const sentences = content.split(/[।!?\n]/).filter(s => s.trim().length > 0);
+    const factMap = new Map<string, string>();
+    
+    // Extract facts from each sentence
+    sentences.forEach(sentence => {
+      const trimmedSentence = sentence.trim();
+      
+      // Pattern: "তার বাবার নাম শেখ মনসুর আলী"
+      const namePattern = /(.+?)\s+(বাবার|মাতার|মায়ের|মেয়ের|ছেলের|পিতার|কন্যার|পুত্রের)\s+নাম\s+(.+)/;
+      const nameMatch = trimmedSentence.match(namePattern);
+      
+      if (nameMatch) {
+        const person = nameMatch[1].trim();
+        const relation = nameMatch[2].trim();
+        const name = nameMatch[3].trim();
+        
+        const key = `${person}_${relation}_নাম`;
+        factMap.set(key, name);
+        
+        console.log('Extracted fact:', key, '=', name);
+      }
+      
+      // Alternative pattern: "তার মেয়ের নাম রেহানা"
+      const altNamePattern = /(তার|তাঁর|তিনি)\s+(বাবার|মাতার|মায়ের|মেয়ের|ছেলের|পিতার|কন্যার|পুত্রের)\s+নাম\s+(.+)/;
+      const altNameMatch = trimmedSentence.match(altNamePattern);
+      
+      if (altNameMatch) {
+        const relation = altNameMatch[2].trim();
+        const name = altNameMatch[3].trim();
+        
+        const key = `main_person_${relation}_নাম`;
+        factMap.set(key, name);
+        
+        console.log('Extracted alternative fact:', key, '=', name);
+      }
+      
+      // Birth year pattern
+      const birthPattern = /(\d{4})\s*সালে?\s*(জন্ম|জন্মগ্রহণ)/;
+      const birthMatch = trimmedSentence.match(birthPattern);
+      
+      if (birthMatch) {
+        factMap.set('জন্ম_সাল', birthMatch[1]);
+        console.log('Extracted birth year:', birthMatch[1]);
+      }
+      
+      // Simple name extraction: "নাম [name]"
+      const simpleNamePattern = /নাম\s+([^\s।]+)/;
+      const simpleNameMatch = trimmedSentence.match(simpleNamePattern);
+      
+      if (simpleNameMatch) {
+        factMap.set('সাধারণ_নাম', simpleNameMatch[1]);
+        console.log('Extracted simple name:', simpleNameMatch[1]);
+      }
+    });
+    
+    console.log('All extracted facts:', Array.from(factMap.entries()));
+    
+    // Now analyze the question to find what specific information is being asked
+    const questionWords = normalizedQuestion.split(/\s+/);
+    
+    // Check if it's asking for a name
+    if (questionWords.includes('নাম') && questionWords.includes('কি')) {
+      // Determine whose name is being asked
+      let targetRelation = '';
+      
+      for (const [relation, variations] of Object.entries(this.relationshipMapping)) {
+        if (variations.some(variant => normalizedQuestion.includes(variant))) {
+          targetRelation = relation;
+          break;
+        }
+      }
+      
+      if (targetRelation) {
+        // Look for the specific relationship fact
+        const relationKey = `main_person_${targetRelation}র_নাম`;
+        const relationKeyAlt = `main_person_${targetRelation}_নাম`;
+        
+        console.log('Looking for relation key:', relationKey, 'or', relationKeyAlt);
+        
+        if (factMap.has(relationKey)) {
+          return factMap.get(relationKey)!;
+        }
+        
+        if (factMap.has(relationKeyAlt)) {
+          return factMap.get(relationKeyAlt)!;
+        }
+        
+        // Fallback: search for any key containing the relation
+        for (const [key, value] of factMap.entries()) {
+          if (key.includes(targetRelation)) {
+            return value;
+          }
+        }
+      }
+    }
+    
+    // If no specific fact found, try the old method
+    return this.analyzeQuestionAndExtractAnswer(question, content);
+  }
+
   private analyzeQuestionAndExtractAnswer(question: string, content: string): string {
     const normalizedQuestion = this.normalizeText(question);
     const normalizedContent = this.normalizeText(content);
@@ -136,15 +257,12 @@ class AIServiceClass {
     console.log('Analyzing question:', normalizedQuestion);
     console.log('Content to search:', normalizedContent);
     
-    // Split content into sentences
     const sentences = content.split(/[।!?\n]/).filter(s => s.trim().length > 0);
     
-    // Find question type and key information
     const questionWords = normalizedQuestion.split(/\s+/);
     let questionType = 'general';
     let targetEntity = '';
     
-    // Determine question type and extract target entity
     for (const [type, patterns] of Object.entries(this.questionPatterns)) {
       if (patterns.some(pattern => normalizedQuestion.includes(pattern))) {
         questionType = type;
@@ -152,7 +270,6 @@ class AIServiceClass {
       }
     }
     
-    // Extract the main subject (person/thing being asked about)
     const importantWords = questionWords.filter(word => 
       word.length > 2 && 
       !Object.values(this.questionPatterns).flat().includes(word) &&
@@ -165,8 +282,9 @@ class AIServiceClass {
     
     console.log('Question type:', questionType, 'Target entity:', targetEntity);
     
-    // Generate specific answer based on question type
     switch (questionType) {
+      case 'name':
+        return this.extractNameAnswer(question, sentences, targetEntity);
       case 'where':
         return this.extractLocationAnswer(question, sentences, targetEntity);
       case 'when':
@@ -180,18 +298,36 @@ class AIServiceClass {
     }
   }
 
+  // New method for extracting name-related answers
+  private extractNameAnswer(question: string, sentences: string[], targetEntity: string): string {
+    const normalizedQuestion = this.normalizeText(question);
+    
+    for (const sentence of sentences) {
+      const normalizedSentence = this.normalizeText(sentence);
+      
+      // Check for name patterns
+      if (normalizedSentence.includes('নাম')) {
+        // Pattern for "তার মেয়ের নাম রেহানা"
+        const nameMatch = sentence.match(/নাম\s+([^\s।]+)/);
+        if (nameMatch) {
+          return nameMatch[1];
+        }
+      }
+    }
+    
+    return "দুঃখিত, নামের তথ্য খুঁজে পাইনি।";
+  }
+
   private extractLocationAnswer(question: string, sentences: string[], targetEntity: string): string {
     console.log('Extracting location answer for:', targetEntity);
     
     for (const sentence of sentences) {
       const normalizedSentence = this.normalizeText(sentence);
       
-      // Check if sentence contains the target entity
       if (targetEntity && !normalizedSentence.includes(targetEntity)) {
         continue;
       }
       
-      // Look for location patterns
       const locationPatterns = [
         /(\w+)\s*গ্রামে?\s*(জন্ম|জন্মগ্রহণ)/,
         /(জন্ম|জন্মগ্রহণ).*?(\w+)\s*গ্রামে?/,
@@ -204,7 +340,6 @@ class AIServiceClass {
         if (match) {
           const location = match[1] || match[2];
           if (location && location.length > 1) {
-            // Format the answer properly
             if (question.includes('জন্ম')) {
               return `${targetEntity || 'তিনি'} ${location}${location.endsWith('ে') ? '' : 'তে'} জন্মগ্রহণ করেন।`;
             } else if (question.includes('মৃত্যু') || question.includes('মারা')) {
@@ -230,7 +365,6 @@ class AIServiceClass {
         continue;
       }
       
-      // Look for year patterns
       const yearMatch = sentence.match(/(\d{4})\s*সালে?/);
       if (yearMatch) {
         const year = yearMatch[1];
@@ -243,7 +377,6 @@ class AIServiceClass {
         }
       }
       
-      // Look for date patterns
       const dateMatch = sentence.match(/(\d{1,2})\s*(জানুয়ারি|ফেব্রুয়ারি|মার্চ|এপ্রিল|মে|জুন|জুলাই|আগস্ট|সেপ্টেম্বর|অক্টোবর|নভেম্বর|ডিসেম্বর)/);
       if (dateMatch) {
         return `${dateMatch[1]} ${dateMatch[2]}।`;
@@ -258,7 +391,6 @@ class AIServiceClass {
       const normalizedSentence = this.normalizeText(sentence);
       
       if (targetEntity && normalizedSentence.includes(targetEntity)) {
-        // Extract description after the entity name
         const parts = sentence.split(targetEntity);
         if (parts.length > 1) {
           const description = parts[1].trim();
@@ -282,7 +414,6 @@ class AIServiceClass {
   }
 
   private extractGeneralAnswer(question: string, sentences: string[], targetEntity: string): string {
-    // Find the most relevant sentence
     let bestSentence = '';
     let maxRelevance = 0;
     
@@ -314,16 +445,13 @@ class AIServiceClass {
       return [];
     }
     
-    // Use Fuse.js for fuzzy search
     const fuseResults = this.fuseInstance.search(normalizedQuestion);
     
-    // Filter results with good scores
     const goodMatches = fuseResults
       .filter(result => result.score! < 0.5)
       .map(result => result.item);
     
     if (goodMatches.length === 0) {
-      // Fallback to keyword matching
       const questionWords = normalizedQuestion.split(/\s+/).filter(word => word.length > 2);
       const keywordMatches = this.knowledgeBase.filter(item => {
         const itemText = this.normalizeText(`${item.title} ${item.content} ${item.keywords.join(' ')}`);
@@ -357,22 +485,21 @@ class AIServiceClass {
   async generateResponse(question: string): Promise<string> {
     const normalizedQuestion = this.normalizeText(question);
     
-    // Find the best matching knowledge items
     const relevantKnowledge = this.findBestMatches(question);
     
     console.log('Found relevant knowledge:', relevantKnowledge.length);
     
     if (relevantKnowledge.length > 0) {
-      // Try to extract a precise answer using the new method
-      const preciseAnswer = this.analyzeQuestionAndExtractAnswer(question, relevantKnowledge[0].content);
+      // First try the new specific extraction method
+      const specificAnswer = this.extractSpecificAnswer(question, relevantKnowledge[0].content);
       
-      if (preciseAnswer && !preciseAnswer.includes('দুঃখিত')) {
-        return preciseAnswer;
+      if (specificAnswer && !specificAnswer.includes('দুঃখিত')) {
+        return specificAnswer;
       }
       
-      // If no precise answer, try with multiple knowledge sources
+      // Try with multiple knowledge sources
       for (const knowledge of relevantKnowledge) {
-        const answer = this.analyzeQuestionAndExtractAnswer(question, knowledge.content);
+        const answer = this.extractSpecificAnswer(question, knowledge.content);
         if (answer && !answer.includes('দুঃখিত')) {
           return answer;
         }
@@ -393,13 +520,10 @@ class AIServiceClass {
     const isWhereQuestion = questionWords.some(word => ['কোথায়', 'কোন'].includes(word));
     const isWhenQuestion = questionWords.some(word => ['কখন', 'কত'].includes(word));
     
-    // Use the most relevant knowledge
     const primaryKnowledge = knowledgeItems[0];
     
-    // Extract relevant part of content based on question type
     let responseContent = primaryKnowledge.content;
     
-    // Try to find specific sentences that might answer the question
     const sentences = primaryKnowledge.content.split(/[।!?]/);
     const relevantSentences = sentences.filter(sentence => {
       const sentenceNormalized = this.normalizeText(sentence);
@@ -412,7 +536,6 @@ class AIServiceClass {
       responseContent = relevantSentences.join('। ') + '।';
     }
     
-    // Generate contextual response based on question type
     if (isWhatQuestion) {
       return `"${primaryKnowledge.title}" সম্পর্কে আমি জানি যে: ${responseContent.substring(0, 400)}${responseContent.length > 400 ? '...' : ''}`;
     } else if (isHowQuestion) {
@@ -425,7 +548,6 @@ class AIServiceClass {
       return `"${primaryKnowledge.title}" এর সময়কাল: ${responseContent.substring(0, 400)}${responseContent.length > 400 ? '...' : ''}`;
     }
     
-    // Default response with multiple knowledge sources
     let response = `আপনার প্রশ্নের উত্তরে আমি বলতে পারি:\n\n`;
     response += `"${primaryKnowledge.title}" থেকে: ${responseContent.substring(0, 300)}${responseContent.length > 300 ? '...' : ''}`;
     
