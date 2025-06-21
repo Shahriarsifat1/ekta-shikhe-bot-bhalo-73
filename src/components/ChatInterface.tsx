@@ -19,7 +19,7 @@ export const ChatInterface = () => {
     {
       id: "1",
       type: "bot",
-      content: "হ্যালো! আমি একটা স্মার্ট AI বট। আমি আপনার প্রশ্নের উত্তর দিতে পারি এবং নতুন জিনিস শিখতে পারি। আপনি আমাকে কিছু জিজ্ঞেস করুন!",
+      content: "হ্যালো! আমি আদ্রিতা জান্নাত, আপনার স্মার্ট AI সহায়ক। আমি আপনার প্রশ্নের উত্তর দিতে পারি এবং নতুন জিনিস শিখতে পারি। আপনি আমাকে কিছু জিজ্ঞেস করুন!",
       timestamp: new Date()
     }
   ]);
@@ -81,7 +81,7 @@ export const ChatInterface = () => {
   };
 
   return (
-    <Card className="h-[600px] bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+    <Card className="h-full bg-white/90 backdrop-blur-sm border-0 shadow-xl flex flex-col">
       <CardContent className="p-0 h-full flex flex-col">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((message) => (
